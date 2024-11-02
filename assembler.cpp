@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <iomanip>
 #include <vector>
 #include <map>
 #include <sstream>
@@ -342,5 +343,72 @@ public:
         }
 
         return bytecode;
+    }
+
+    void writeOutput(const string &filename)
+    {
+        ofstream binFile(filename, ios::binary);
+        if (!binFile.is_open())
+        {
+            throw runtime_error("Cannot open output file: " + filename);
+        }
+
+        // Write in text format (for debugging)
+        string txtFilename = filename + ".txt";
+        ofstream txtFile(txtFilename);
+        if (!txtFile.is_open())
+        {
+            throw runtime_error("Cannot open text output file: " + txtFilename);
+        }
+
+        // Writting text section
+        txtFile << "\n.text section (Base address: 0x00000000)" << endl;
+        auto &textSection = sections[".text"].content;
+        uint32_t addr = sections[".text"].address;
+
+        for (uint32_t instruction : textSection)
+        {
+            // Write to binary file
+            binFile.write(reinterpret_cast<const char *>(&instruction), sizeof(instruction));
+
+            // Write to text file
+            txtFile << hex << setw(8) << setfill('0') << addr << "  ";
+            txtFile << instructionToString(instruction) << endl;
+
+            addr += 4;
+        }
+
+        // Write data section
+        txtFile << "\n.data section (Base address: 0x10000000)" << endl;
+        auto &dataSection = sections[".data"].content;
+        addr = sections[".data"].address;
+        for (uint32_t data : dataSection)
+        {
+            // Write to binary file
+            binFile.write(reinterpret_cast<const char *>(&data), sizeof(data));
+
+            // Write to text file
+            txtFile << hex << setw(8) << setfill('0') << addr << "  ";
+            txtFile << setw(8) << setfill('0') << data << " ; [data]" << endl;
+
+            addr += 4;
+        }
+
+        // Writing the remaining bytecode (if any)
+        for (uint32_t instruction : bytecode)
+        {
+            binFile.write(reinterpret_cast<const char *>(&instruction), sizeof(instruction));
+
+            txtFile << hex << std::setw(8) << setfill('0') << addr << "  ";
+            txtFile << instructionToString(instruction) << endl;
+
+            addr += 4;
+        }
+
+        binFile.close();
+        txtFile.close();
+
+        cout << "Binary output written to: " << filename << endl;
+        cout << "Text output written to: " << txtFilename << endl;
     }
 };
