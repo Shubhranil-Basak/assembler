@@ -3,10 +3,12 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <sstream>
 #include <algorithm>
 
 using namespace std;
 
+// Instruction type enum
 enum InstructionType
 {
     R_TYPE,
@@ -14,6 +16,7 @@ enum InstructionType
     J_TYPE
 };
 
+// Instruction structure
 struct Instruction
 {
     string name;
@@ -38,7 +41,7 @@ struct Section
 
 map<string, Instruction> instructions = {
 
-    //R-type format
+    // R-type format
     {"ADD", {"ADD", R_TYPE, 0}},
     {"SUB", {"SUB", R_TYPE, 1}},
     {"MUL", {"MUL", R_TYPE, 2}},
@@ -71,10 +74,9 @@ map<string, Instruction> instructions = {
     {"MAI", {"MAI", I_TYPE, 27}},
     {"EXT", {"EXT", I_TYPE, 31}},
 
-    //J-type format 
+    // J-type format
     {"JUMP", {"JUMP", J_TYPE, 29}},
     {"JAL", {"JAL", J_TYPE, 30}}};
-
 
 class Assembler
 {
@@ -88,6 +90,7 @@ private:
     uint32_t textBaseAddress = 0x00000000;
     uint32_t dataBaseAddress = 0x10000000;
 
+    // Helper function to parse different parts of instructions
     int parseRegister(const std::string &reg)
     {
         if (reg[0] != 'R' && reg[0] != 'r')
@@ -137,7 +140,7 @@ private:
             return instruction;
         }
 
-        // For normal I-type instructions
+        // Normal I-type instructions
         instruction |= (static_cast<uint32_t>(parseRegister(operands[0])) << 21); // rd
         instruction |= (static_cast<uint32_t>(parseRegister(operands[1])) << 16); // rs
 
@@ -196,4 +199,148 @@ private:
         currentSection = &sections[".text"]; // Default
     }
 
+    void handleDirective(const std::string &directive, std::stringstream &ss)
+    {
+        if (directive == ".text" || directive == ".data")
+        {
+            currentSection = &sections[directive];
+            currentAddress = currentSection->address;
+        }
+        else if (directive == ".word")
+        {
+            std::string value;
+            while (ss >> value)
+            {
+                if (value.back() == ',')
+                    value.pop_back();
+                sections[".data"].content.push_back(std::stoi(value));
+                currentAddress += 4;
+            }
+        }
+    }
+
+public:
+    Assembler() : currentAddress(0) {}
+
+    vector<uint32_t> assemble(const string &filename)
+    {
+        initializeSections();
+
+        ifstream file(filename);
+        if (!file.is_open())
+        {
+            throw runtime_error("Cannot open input file: " + filename);
+        }
+
+        vector<string> lines;
+        string line;
+        while (getline(file, line))
+        {
+            lines.push_back(line);
+        }
+        file.close();
+
+        // First pass: collect labels
+        firstPass(lines);
+
+        // Setting everything to 0/default
+
+        currentAddress = 0;
+        bytecode.clear();
+
+        // Second pass: generate bytecode
+        for (const auto &line : lines)
+        {
+            if (line.empty() || line[0] == ';')
+            {
+                continue; // skip empty lines and comments
+            }
+
+            string processedLine = line;
+            size_t commentPos = line.find(';');
+            if (commentPos != string::npos)
+            {
+                processedLine = line.substr(0, commentPos);
+            }
+
+            // Handle labels
+            size_t labelEnd = processedLine.find(':');
+            if (labelEnd != string::npos)
+            {
+                processedLine = processedLine.substr(labelEnd + 1);
+            }
+
+            // Removing leading/trailing whitespace
+            processedLine.erase(0, processedLine.find_first_not_of(" \t"));
+            processedLine.erase(processedLine.find_last_not_of(" \t") + 1);
+
+            if (processedLine.empty())
+            {
+                continue;
+            }
+
+            // Now to parse lines
+            stringstream ss(processedLine);
+            string firstToken;
+            ss >> firstToken;
+
+            if (firstToken[0] == '.')
+            {
+                // Handle section directives and data definitions
+                handleDirective(firstToken, ss);
+                continue; // Skip to next line after handling directive
+            }
+
+            // If not a directive, process as an instruction
+            string op = firstToken;
+            transform(op.begin(), op.end(), op.begin(), ::toupper);
+
+            // Parse instruction operands
+            vector<string> operands;
+            string operand;
+
+            while (ss >> operand)
+            {
+                if (operand.back() == ',')
+                {
+                    operand.pop_back();
+                }
+                operands.push_back(operand);
+            }
+
+            uint32_t instruction;
+            if (op == "NOP")
+            {
+                instruction = 0;
+            }
+            else
+            {
+                auto it = instructions.find(op);
+                if (it == instructions.end())
+                {
+                    throw runtime_error("Unknown instruction: " + op);
+                }
+
+                switch (it->second.type)
+                {
+                case R_TYPE:
+                    instruction = generateRType(op, operands);
+                    break;
+                case I_TYPE:
+                    instruction = generateIType(op, operands);
+                    break;
+                case J_TYPE:
+                    instruction = generateJType(op, operands);
+                    break;
+                default:
+                    throw runtime_error("Unknown instruction type");
+                }
+            }
+
+            currentSection->content.push_back(instruction);
+            currentAddress += 4;
+        }
+
+        return bytecode;
+    }
 };
