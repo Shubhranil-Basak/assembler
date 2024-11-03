@@ -91,26 +91,102 @@ private:
     uint32_t textBaseAddress = 0x00000000;
     uint32_t dataBaseAddress = 0x10000000;
 
+    string instructionToString(uint32_t instruction)
+    {
+        stringstream ss;
+        uint32_t opcode = (instruction >> 26) & 0x3F;
+
+        // Find instruction name
+        string instName = "Unknown";
+        for (const auto &pair : instructions)
+        {
+            if (pair.second.opcode == opcode)
+            {
+                instName = pair.first; // Use the actual instruction from the map
+                break;
+            }
+        }
+
+        ss << hex << setw(8) << setfill('0') << instruction << " ; "
+           << setw(6) << left << instName << " ; ";
+
+        if (opcode <= 13)
+        {
+            // R-type
+            uint32_t rd = (instruction >> 21) & 0x1F;
+            uint32_t rs = (instruction >> 16) & 0x1F;
+            uint32_t rt = (instruction >> 11) & 0x1F;
+            ss << "R" << dec << rd << ", R" << rs << ", R" << rt;
+        }
+        else if (opcode <= 28 || opcode == 31)
+        {
+            // I-type
+            uint32_t rd = (instruction >> 21) & 0x1F;
+            uint32_t rs = (instruction >> 16) & 0x1F;
+            int16_t imm = instruction & 0xFFFF;
+            ss << "R" << dec << rd << ", R" << rs << ", " << imm;
+        }
+        else
+        {
+            // J-type
+            uint32_t addr = instruction & 0x3FFFFFF;
+            ss << "0x" << hex << addr;
+        }
+        return ss.str();
+    }
+
     // Helper function to parse different parts of instructions
-    int parseRegister(const std::string &reg)
+    int parseRegister(const string &reg)
     {
         if (reg[0] != 'R' && reg[0] != 'r')
         {
-            throw std::runtime_error("Invalid register format: " + reg);
+            throw runtime_error("Invalid register format: " + reg);
         }
-        return std::stoi(reg.substr(1));
+        return stoi(reg.substr(1));
     }
 
-    int parseImmediate(const std::string &imm)
+    int parseImmediate(const string &imm)
     {
         if (imm[0] == '#')
         {
-            return std::stoi(imm.substr(1));
+            return stoi(imm.substr(1));
         }
-        return std::stoi(imm);
+        return stoi(imm);
     }
 
-    uint32_t generateRType(const std::string &op, const std::vector<std::string> &operands)
+    // First pass: collect labels
+    void firstPass(const vector<string> &lines)
+    {
+        currentAddress = 0;
+        for (const auto &line : lines)
+        {
+            if (line.empty() || line[0] == ';')
+                continue;
+
+            string processedLine = line;
+            size_t commentPos = line.find(';');
+            if (commentPos != string::npos)
+            {
+                processedLine = line.substr(0, commentPos);
+            }
+
+            size_t labelEnd = processedLine.find(':');
+            if (labelEnd != string::npos)
+            {
+                string label = processedLine.substr(0, labelEnd);
+                label.erase(remove_if(label.begin(), label.end(), isspace), label.end());
+                labels[label] = currentAddress;
+                processedLine = processedLine.substr(labelEnd + 1);
+            }
+
+            if (!processedLine.empty())
+            {
+                currentAddress += 4;
+            }
+        }
+    }
+
+    uint32_t generateRType(const string &op, const vector<string> &operands)
     {
         uint32_t instruction = 0;
         instruction |= (static_cast<uint32_t>(instructions[op].opcode) << 26);
@@ -130,7 +206,7 @@ private:
         return instruction;
     }
 
-    uint32_t generateIType(const std::string &op, const std::vector<std::string> &operands)
+    uint32_t generateIType(const string &op, const vector<string> &operands)
     {
         uint32_t instruction = 0;
         instruction |= (static_cast<uint32_t>(instructions[op].opcode) << 26);
@@ -159,7 +235,7 @@ private:
             }
             else
             {
-                throw std::runtime_error("Unknown label: " + operands[2]);
+                throw runtime_error("Unknown label: " + operands[2]);
             }
         }
 
@@ -167,7 +243,7 @@ private:
         return instruction;
     }
 
-    uint32_t generateJType(const std::string &op, const std::vector<std::string> &operands)
+    uint32_t generateJType(const string &op, const vector<string> &operands)
     {
         uint32_t instruction = 0;
         instruction |= (static_cast<uint32_t>(instructions[op].opcode) << 26);
@@ -185,7 +261,7 @@ private:
             }
             else
             {
-                throw std::runtime_error("Unknown label: " + operands[0]);
+                throw runtime_error("Unknown label: " + operands[0]);
             }
         }
 
@@ -200,7 +276,7 @@ private:
         currentSection = &sections[".text"]; // Default
     }
 
-    void handleDirective(const std::string &directive, std::stringstream &ss)
+    void handleDirective(const string &directive, stringstream &ss)
     {
         if (directive == ".text" || directive == ".data")
         {
@@ -209,12 +285,12 @@ private:
         }
         else if (directive == ".word")
         {
-            std::string value;
+            string value;
             while (ss >> value)
             {
                 if (value.back() == ',')
                     value.pop_back();
-                sections[".data"].content.push_back(std::stoi(value));
+                sections[".data"].content.push_back(stoi(value));
                 currentAddress += 4;
             }
         }
@@ -361,6 +437,10 @@ public:
             throw runtime_error("Cannot open text output file: " + txtFilename);
         }
 
+        // Write header to text file
+        txtFile << "Address\t\tMachine Code  Instruction" << endl;
+        txtFile << "----------------------------------------" << endl;
+
         // Writting text section
         txtFile << "\n.text section (Base address: 0x00000000)" << endl;
         auto &textSection = sections[".text"].content;
@@ -399,7 +479,7 @@ public:
         {
             binFile.write(reinterpret_cast<const char *>(&instruction), sizeof(instruction));
 
-            txtFile << hex << std::setw(8) << setfill('0') << addr << "  ";
+            txtFile << hex << setw(8) << setfill('0') << addr << "  ";
             txtFile << instructionToString(instruction) << endl;
 
             addr += 4;
