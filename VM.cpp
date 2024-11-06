@@ -229,13 +229,13 @@ private:
                  << " RS: R" << getRs(instruction)
                  << " RT: R" << getRt(instruction);
         }
-        else if(opcode <= 28 || opcode == 31)
+        else if (opcode <= 28 || opcode == 31)
         {
             cout << " RD: R" << dec << getRd(instruction)
                  << " RS: R" << getRs(instruction)
                  << " IMM: " << getImmediate(instruction);
         }
-        else if(opcode <= 30)
+        else if (opcode <= 30)
         {
             cout << " ADDR: 0x" << hex << getJumpAddress(instruction);
         }
@@ -247,6 +247,87 @@ public:
         for (int i = 0; i < NUM_REGISTERS; i++)
         {
             registers[i] = 0;
+        }
+    }
+
+    void loadProgram(const string &filename)
+    {
+        ifstream file(filename, ios::binary);
+        if (!file.is_open())
+        {
+            throw runtime_error("Failed to open file: " + filename);
+        }
+
+        uint32_t addr = 0;
+        uint32_t word;
+        while (file.read(reinterpret_cast<char *>(&word), sizeof(word)))
+        {
+            if (addr / 4 >= memory.size())
+            {
+                throw runtime_error("Program counter out of bounds");
+            }
+            memory[addr / 4] = word;
+            addr += 4;
+        }
+        file.close();
+    }
+
+    void run(bool debug = false)
+    {
+        pc = 0;
+        running = true;
+
+        while (running)
+        {
+            if (pc / 4 >= memory.size())
+            {
+                throw runtime_error("Program counter out of bounds");
+            }
+
+            uint32_t instruction = memory[pc / 4];
+
+            if (debug)
+            {
+                printInstruction(instruction);
+            }
+
+            uint32_t opcode = getOpcode(instruction);
+
+            try
+            {
+                if (opcode <= 13)
+                {
+                    executeRType(instruction);
+                }
+                else if (opcode <= 28 || opcode == 31)
+                {
+                    executeIType(instruction);
+                }
+                else if (opcode <= 30)
+                {
+                    executeJType(instruction);
+                }
+                else
+                {
+                    throw runtime_error("Invalid opcode: " + to_string(opcode));
+                }
+            }
+            catch (const exception &e)
+            {
+                cerr << "Runtime error at PC=" << hex << pc << ": " << e.what() << endl;
+                running = false;
+                break;
+            }
+
+            pc += 4;
+            registers[0] = 0;
+
+            if (debug)
+            {
+                cout << "Registers after instruction:" << endl;
+                dumpRegisters();
+                cout << "----------------------" << endl;
+            }
         }
     }
     
