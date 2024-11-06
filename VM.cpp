@@ -183,7 +183,7 @@ private:
         case 26: // BEQ
             if (registers[rd] == registers[rs])
             {
-                pc += ((imm-4) * 4);
+                pc += ((imm - 4) * 4);
             }
             break;
         case 27: // BNE
@@ -218,4 +218,36 @@ private:
             break;
         }
     }
+
+    void printInstruction(uint32_t instruction)
+    {
+        uint32_t opcode = getOpcode(instruction);
+        cout << "PC: 0x" << hex << pc << " Instruction: 0x" << instruction;
+        if (opcode <= 13)
+        {
+            cout << " RD: R" << dec << getRd(instruction)
+                 << " RS: R" << getRs(instruction)
+                 << " RT: R" << getRt(instruction);
+        }
+        else if(opcode <= 28 || opcode == 31)
+        {
+            cout << " RD: R" << dec << getRd(instruction)
+                 << " RS: R" << getRs(instruction)
+                 << " IMM: " << getImmediate(instruction);
+        }
+        else if(opcode <= 30)
+        {
+            cout << " ADDR: 0x" << hex << getJumpAddress(instruction);
+        }
+    }
+
+public:
+    VirtualMachine() : memory(MEMORY_SIZE / 4), pc(0), running(false)
+    {
+        for (int i = 0; i < NUM_REGISTERS; i++)
+        {
+            registers[i] = 0;
+        }
+    }
+    
 };
