@@ -330,5 +330,23 @@ public:
             }
         }
     }
-    
+
+    void dumpRegisters()
+    {
+        for (int i = 0; i < NUM_REGISTERS; i++)
+        {
+            cout << "R" << i << ": 0x" << hex << registers[i] << dec << endl;
+        }
+    }
+
+    void dumpMemory(uint32_t start, uint32_t count)
+    {
+        for (uint32_t i = 0; i < count; i++)
+        {
+            if (i % 4 == 0)
+                cout << "\n0x" << hex << (start + i * 4) << ": ";
+            cout << "0x" << hex << memory[start / 4 + i] << " ";
+        }
+        cout << dec << endl;
+    }
 };
