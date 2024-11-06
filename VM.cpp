@@ -349,4 +349,73 @@ public:
         }
         cout << dec << endl;
     }
+
+    void run_steps()
+    {
+        pc = 0;
+        running = true;
+
+        while (running)
+        {
+            if (pc / 4 >= memory.size())
+            {
+                throw runtime_error("Program counter out of bounds");
+            }
+
+            if (cin.peek() != '\n' && cin.peek() != EOF)
+            {
+                char c;
+                cin >> c;
+
+                if (c == 'q')
+                {
+                    running = false;
+                    break;
+                }
+            }
+            else
+            {
+                cin.ignore();
+            }
+
+            uint32_t instruction = memory[pc / 4];
+            printInstruction(instruction);
+
+            uint32_t opcode = getOpcode(instruction);
+
+            try
+            {
+                if (opcode <= 13)
+                {
+                    executeRType(instruction);
+                }
+                else if (opcode <= 28 || opcode == 31)
+                {
+                    executeIType(instruction);
+                }
+                else if (opcode <= 30)
+                {
+                    executeJType(instruction);
+                }
+                else
+                {
+                    throw runtime_error("Invalid opcode: " + to_string(opcode));
+                }
+            }
+            catch (const exception &e)
+            {
+                cerr << "Runtime error at PC=" << hex << pc << ": " << e.what() << endl;
+                running = false;
+                break;
+            }
+
+            pc += 4;
+            registers[0] = 0;
+
+            cout << "Registers after instruction:" << endl;
+            dumpRegisters();
+            cout << "----------------------" << endl;
+        }
+    }
 };
+
