@@ -419,3 +419,86 @@ public:
     }
 };
 
+int main(int argc, char *argv[])
+{
+    if (argc < 2 || argc > 3)
+    { // Allow for an optional third argument
+        cerr << "Usage: " << argv[0] << " <program.bin> [-d (optional, debug mode)]" << "\n"
+                  << "Use" << argv[0] << " -h to get help" << endl;
+        return 1;
+    }
+
+    bool debugMode = false; // Default is debug mode off
+    if (argc == 3 && string(argv[2]) == "-d")
+    {
+        debugMode = true; // Enable debug mode if -d flag is present
+
+        try
+        {
+            VirtualMachine vm;
+            vm.loadProgram(argv[1]);
+            vm.run(debugMode); // Pass debug mode to the run function
+
+            cout << "\nProgram finished. Register dump:" << endl;
+            vm.dumpRegisters();
+            return 0;
+        }
+        catch (const exception &e)
+        {
+            cerr << "Error: " << e.what() << endl;
+            return 1;
+        }
+    }
+    else if (argc == 3 && string(argv[2]) == "-s")
+    {
+        try
+        {
+            VirtualMachine vm;
+            vm.loadProgram(argv[1]);
+            cout << "Starting program execution in step mode..." << endl;
+            cout << "Press any key to execute the next instruction." << endl;
+            cout << "Press 'q' to quit." << endl;
+            vm.run_steps(); // Pass debug mode to the run function
+            cout << "Program finished. Register dump:" << endl;
+            vm.dumpRegisters();
+            return 0;
+        }
+        catch (const exception &e)
+        {
+            cerr << "Error: " << e.what() << endl;
+            return 1;
+        }
+    }
+    else if (argc == 3 && string(argv[2]) == "-h")
+    {
+        cout << "Usage: " << argv[0] << " <program.bin> <flag>" << endl;
+        cout << "Use -d flag to run the program in debug mode." << endl;
+        cout << "Use -s flag to run the program in step mode. Debug mode is set to true" << endl;
+        cout << "Use -h flag to display this text." << endl;
+        return 0;
+    }
+    else if (argc >= 3)
+    {
+        cerr << "Usage: " << argv[0] << " <program.bin> [-d (optional, debug mode)]" << "\n"
+                  << "Use" << argv[0] << " -h to get help" << endl;
+        return 1;
+    }
+
+    try
+    {
+        VirtualMachine vm;
+        vm.loadProgram(argv[1]);
+        vm.run(debugMode); // Pass debug mode to the run function
+
+        cout << "\nProgram finished. Register dump:" << endl;
+        vm.dumpRegisters();
+    }
+    catch (const exception &e)
+    {
+        cerr << "Error: " << e.what() << endl;
+        return 1;
+    }
+
+    return 0;
+}
+
