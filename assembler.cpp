@@ -492,3 +492,27 @@ public:
         cout << "Text output written to: " << txtFilename << endl;
     }
 };
+
+int main(int argc, char *argv[])
+{
+    if (argc != 3)
+    {
+        cerr << "Usage: " << argv[0] << " <input.asm> <output.bin>" << endl;
+        return 1;
+    }
+
+    try
+    {
+        Assembler assembler;
+        assembler.assemble(argv[1]);
+        assembler.writeOutput(argv[2]);
+        cout << "Assembly successful!" << endl;
+    }
+    catch (const exception &e)
+    {
+        cerr << "Error: " << e.what() << endl;
+        return 1;
+    }
+
+    return 0;
+}
