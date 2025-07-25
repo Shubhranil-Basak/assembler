@@ -1,0 +1,1 @@
+This was my first attempt at writing an assembler after it was discussed in class. I also tried writing a language which was supposed to be complied and assembled later using this assembler. The assembler works but I left the language project mid-way. So, this repo in its self won't work without the language and compiler. I hope someday I can complete both these projects.
